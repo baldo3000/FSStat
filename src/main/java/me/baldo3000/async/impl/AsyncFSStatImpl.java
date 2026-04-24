@@ -14,50 +14,48 @@ import java.util.Set;
 
 public class AsyncFSStatImpl implements AsyncFSStat {
 
-    private final Vertx vertx;
     private final FileSystem fileSystem;
 
-    public AsyncFSStatImpl() {
-        this.vertx = Vertx.vertx();
+    public AsyncFSStatImpl(Vertx vertx) {
         this.fileSystem = vertx.fileSystem();
     }
 
-    public Future<List<String>> getFSReport(Path directory) {
+    public Future<Integer> getFSReport(Path directory) {
         IO.println("Generating FS report for directory: " + directory);
         return getFSReportRecursive(directory.toString(), new HashSet<>());
     }
 
-    private Future<List<String>> getFSReportRecursive(String directory, Set<String> visited) {
-        Promise<List<String>> promise = Promise.promise();
+    private Future<Integer> getFSReportRecursive(String directory, Set<String> visited) {
+        Promise<Integer> promise = Promise.promise();
 
         if (!visited.add(directory)) {
-            return Future.succeededFuture(List.of());
+            return Future.succeededFuture(0);
         }
-        // log("Recursive step");
+        //log("Recursive step");
 
         this.fileSystem.readDir(directory).onFailure(promise::fail).onSuccess(paths -> {
-            final List<Future<List<String>>> futures = new ArrayList<>();
+            final List<Future<Integer>> futures = new ArrayList<>();
             for (var path : paths) {
-                Future<List<String>> f = this.fileSystem.lprops(path).compose(props -> {
+                Future<Integer> f = this.fileSystem.lprops(path).compose(props -> {
                     if (props.isRegularFile()) {
-                        return Future.succeededFuture(List.of(path));
+                        return Future.succeededFuture(1);
                     } else if (props.isDirectory()) {
                         return getFSReportRecursive(path, visited);
                     } else {
-                        return Future.succeededFuture(List.of());
+                        return Future.succeededFuture(0);
                     }
-                }).recover(_ -> Future.succeededFuture(List.of()));
+                }).recover(_ -> Future.succeededFuture(0));
                 futures.add(f);
             }
 
             Future.all(futures).onSuccess(composite -> {
-                final List<String> files = new ArrayList<>();
+                var counter = 0;
                 for (var res : composite.list()) {
-                    if (res instanceof List<?> list) {
-                        files.addAll((List<? extends String>) list);
+                    if (res instanceof Integer value) {
+                        counter = counter + value;
                     }
                 }
-                promise.complete(new ArrayList<>(files));
+                promise.complete(counter);
             }).onFailure(promise::fail);
         });
 
@@ -66,10 +64,5 @@ public class AsyncFSStatImpl implements AsyncFSStat {
 
     private void log(String msg) {
         System.out.println("[ " + System.currentTimeMillis() + " ][ " + Thread.currentThread() + " ] " + msg);
-    }
-
-    @Override
-    public Future<Void> close() {
-        return this.vertx.close();
     }
 }
