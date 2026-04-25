@@ -5,6 +5,8 @@ import io.vertx.core.Promise;
 import io.vertx.core.Vertx;
 import io.vertx.core.file.FileSystem;
 import me.baldo3000.async.api.AsyncFSStat;
+import me.baldo3000.common.api.FSReport;
+import me.baldo3000.common.impl.ArrayFSReport;
 
 import java.nio.file.Path;
 import java.util.ArrayList;
@@ -20,43 +22,39 @@ public class AsyncFSStatImpl implements AsyncFSStat {
         this.fileSystem = vertx.fileSystem();
     }
 
-    public Future<Integer> getFSReport(Path directory) {
-        IO.println("Generating FS report for directory: " + directory);
-        return getFSReportRecursive(directory.toString(), new HashSet<>());
+    public Future<FSReport> getFSReport(Path directory, long maxFileSize, int bands) {
+        var dir = directory.toString();
+        IO.println("Generating FS report for directory: " + dir);
+        return getFSReportRecursive(dir, new HashSet<>(), new ArrayFSReport(dir, maxFileSize, bands));
     }
 
-    private Future<Integer> getFSReportRecursive(String directory, Set<String> visited) {
-        Promise<Integer> promise = Promise.promise();
+    private Future<FSReport> getFSReportRecursive(String directory, Set<String> visited, FSReport report) {
+        Promise<FSReport> promise = Promise.promise();
 
         if (!visited.add(directory)) {
-            return Future.succeededFuture(0);
+            return Future.succeededFuture(report);
         }
         //log("Recursive step");
 
         this.fileSystem.readDir(directory).onFailure(promise::fail).onSuccess(paths -> {
-            final List<Future<Integer>> futures = new ArrayList<>();
+            final List<Future<FSReport>> futures = new ArrayList<>();
             for (var path : paths) {
-                Future<Integer> f = this.fileSystem.lprops(path).compose(props -> {
+                Future<FSReport> f = this.fileSystem.lprops(path).compose(props -> {
                     if (props.isRegularFile()) {
-                        return Future.succeededFuture(1);
+                        report.countFileBySize(props.size());
+                        return Future.succeededFuture(report);
                     } else if (props.isDirectory()) {
-                        return getFSReportRecursive(path, visited);
+                        return getFSReportRecursive(path, visited, report);
                     } else {
-                        return Future.succeededFuture(0);
+                        return Future.succeededFuture(report);
                     }
-                }).recover(_ -> Future.succeededFuture(0));
+                }).recover(_ -> Future.succeededFuture(report));
                 futures.add(f);
             }
 
-            Future.all(futures).onSuccess(composite -> {
-                var counter = 0;
-                for (var res : composite.list()) {
-                    if (res instanceof Integer value) {
-                        counter = counter + value;
-                    }
-                }
-                promise.complete(counter);
-            }).onFailure(promise::fail);
+            Future.all(futures)
+                    .onSuccess(_ -> promise.complete(report))
+                    .onFailure(promise::fail);
         });
 
         return promise.future();
