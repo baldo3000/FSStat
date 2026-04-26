@@ -30,6 +30,7 @@ public interface FSReport {
 
     /**
      * Count a new file to the FS Report by specifying its size.
+     * <p>The size of the file is assumed to be a positive number.
      *
      * @param size the file size
      */

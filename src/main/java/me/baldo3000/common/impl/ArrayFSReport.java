@@ -47,9 +47,6 @@ public class ArrayFSReport implements FSReport {
 
     @Override
     public void countFileBySize(long size) {
-        if (size < 0) {
-            throw new IllegalArgumentException("File size must be non-negative: " + size);
-        }
         this.filesDistribution[sizeToBandIndex(size)]++;
         this.totalFiles++;
     }
@@ -58,7 +55,6 @@ public class ArrayFSReport implements FSReport {
         if (size > this.maxFileSize) {
             return this.bands;
         }
-        // Integer division is O(1); Math.min is a defensive cap (analytically never fires)
-        return (int) Math.min(size / this.bandWidth, this.bands - 1);
+        return (int) (size / this.bandWidth);
     }
 }
