@@ -37,8 +37,9 @@ public class AsyncFSStatImpl implements AsyncFSStat {
         //log("Recursive step");
 
         this.fileSystem.readDir(directory).onFailure(promise::fail).onSuccess(paths -> {
-            final List<Future<FSReport>> futures = new ArrayList<>();
+            final List<Future<FSReport>> futures = new ArrayList<>(paths.size());
             for (var path : paths) {
+                //this.fileSystem.
                 Future<FSReport> f = this.fileSystem.lprops(path).compose(props -> {
                     if (props.isRegularFile()) {
                         report.countFileBySize(props.size());
@@ -61,6 +62,6 @@ public class AsyncFSStatImpl implements AsyncFSStat {
     }
 
     private void log(String msg) {
-        System.out.println("[ " + System.currentTimeMillis() + " ][ " + Thread.currentThread() + " ] " + msg);
+        IO.println("[ " + System.currentTimeMillis() + " ][ " + Thread.currentThread() + " ] " + msg);
     }
 }
