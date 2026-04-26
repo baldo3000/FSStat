@@ -27,7 +27,7 @@ public class ArrayFSReport implements FSReport {
         this.maxFileSize = maxFileSize;
         this.bands = bands;
         this.filesDistribution = new long[bands + 1];
-        this.bandWidth = maxFileSize / bands + 1;
+        this.bandWidth = maxFileSize / bands;
     }
 
     @Override
