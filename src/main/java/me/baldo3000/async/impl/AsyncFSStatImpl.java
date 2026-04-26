@@ -1,7 +1,6 @@
 package me.baldo3000.async.impl;
 
 import io.vertx.core.Future;
-import io.vertx.core.Promise;
 import io.vertx.core.Vertx;
 import io.vertx.core.file.FileSystem;
 import me.baldo3000.async.api.AsyncFSStat;
@@ -23,42 +22,41 @@ public class AsyncFSStatImpl implements AsyncFSStat {
     }
 
     public Future<FSReport> getFSReport(Path directory, long maxFileSize, int bands) {
+        IO.println("Generating FS report for directory: " + directory);
+
         var dir = directory.toString();
-        IO.println("Generating FS report for directory: " + dir);
-        return getFSReportRecursive(dir, new HashSet<>(), new ArrayFSReport(dir, maxFileSize, bands));
+        var report = new ArrayFSReport(dir, maxFileSize, bands);
+        return getFSReportRecursive(dir, new HashSet<>(), report).map(_ -> report);
     }
 
-    private Future<FSReport> getFSReportRecursive(String directory, Set<String> visited, FSReport report) {
-        Promise<FSReport> promise = Promise.promise();
-
+    private Future<Void> getFSReportRecursive(String directory, Set<String> visited, FSReport report) {
         if (!visited.add(directory)) {
-            return Future.succeededFuture(report);
+            return Future.succeededFuture();
         }
         //log("Recursive step");
 
-        this.fileSystem.readDir(directory).onFailure(promise::fail).onSuccess(paths -> {
-            final List<Future<FSReport>> futures = new ArrayList<>(paths.size());
-            for (var path : paths) {
-                //this.fileSystem.
-                Future<FSReport> f = this.fileSystem.lprops(path).compose(props -> {
-                    if (props.isRegularFile()) {
-                        report.countFileBySize(props.size());
-                        return Future.succeededFuture(report);
-                    } else if (props.isDirectory()) {
-                        return getFSReportRecursive(path, visited, report);
-                    } else {
-                        return Future.succeededFuture(report);
+        return this.fileSystem.readDir(directory)
+                .recover(_ -> Future.succeededFuture(List.of()))
+                .compose(paths -> {
+                    if (paths.isEmpty()) {
+                        return Future.succeededFuture();
                     }
-                }).recover(_ -> Future.succeededFuture(report));
-                futures.add(f);
-            }
+                    final List<Future<Void>> futures = new ArrayList<>(paths.size());
+                    for (var path : paths) {
+                        Future<Void> f = this.fileSystem.lprops(path).compose(props -> {
+                            if (props.isRegularFile()) {
+                                report.countFileBySize(props.size());
+                                return Future.succeededFuture();
+                            } else if (props.isDirectory()) {
+                                return getFSReportRecursive(path, visited, report);
+                            }
+                            return Future.succeededFuture();
+                        }, _ -> Future.succeededFuture());
+                        futures.add(f);
+                    }
 
-            Future.all(futures)
-                    .onSuccess(_ -> promise.complete(report))
-                    .onFailure(promise::fail);
-        });
-
-        return promise.future();
+                    return Future.all(futures).mapEmpty();
+                });
     }
 
     private void log(String msg) {
