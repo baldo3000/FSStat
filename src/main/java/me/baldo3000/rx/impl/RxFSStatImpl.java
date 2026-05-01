@@ -37,15 +37,16 @@ public class RxFSStatImpl implements RxFSStat {
                 emitter.emit(report.countFileBySize(attributes.size()));
 
             } else if (attributes.isDirectory()) {
-                var children = path.toFile().listFiles();
-                if (children == null) {
+                var subPaths = path.toFile().listFiles();
+                if (subPaths == null) {
                     emitter.emit(report);
                     return;
                 }
-                Flowable.fromArray(children)
-                        .flatMap(child -> getFSReport(child.toPath(), maxFileSize, bands).takeLast(1))
-                        .blockingSubscribe(merged -> {
-                                    report.merge(merged);
+
+                Flowable.fromArray(subPaths)
+                        .flatMap(subPath -> getFSReport(subPath.toPath(), maxFileSize, bands).takeLast(1))
+                        .blockingSubscribe(childReport -> {
+                                    report.merge(childReport);
                                     /*if ("C:/Users/andre/Documents/PROGRAMMAZIONE".equals(report.getDirectory())) {
                                         log("Merging: " + merged.getDirectory());
                                         log("Report being generated inside: " + report.toString());
