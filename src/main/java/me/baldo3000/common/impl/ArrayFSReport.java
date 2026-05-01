@@ -51,20 +51,23 @@ public class ArrayFSReport implements FSReport {
     }
 
     @Override
-    public void countFileBySize(long size) {
+    public FSReport countFileBySize(long size) {
         this.filesDistribution[sizeToBandIndex(size)]++;
         this.totalFiles++;
+        return this;
     }
 
     @Override
-    public void merge(FSReport other) {
+    public FSReport merge(FSReport other) {
         if (this.bands != other.getBands()) {
             throw new IllegalArgumentException("Can't merge the two FS Reports, different bands: " + this.bands + " != " + other.getBands());
         }
+        this.totalFiles += other.getTotalFiles();
         var otherDistribution = other.getFilesDistribution();
         for (int i = 0; i <= this.bands; i++) {
             this.filesDistribution[i] += otherDistribution.get(i);
         }
+        return this;
     }
 
     @Override

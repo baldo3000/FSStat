@@ -40,14 +40,16 @@ public interface FSReport {
      * <p>The size of the file is assumed to be a positive number.
      *
      * @param size the file size
+     * @return @return a reference to this, so it can be used fluently
      */
-    void countFileBySize(long size);
+    FSReport countFileBySize(long size);
 
     /**
      * Take another {@code FSReport} and merge it inside {@code this}.
      *
      * @param other the other {@code FSReport} to merge
+     * @return a reference to this, so it can be used fluently
      * @throws IllegalArgumentException if the provided report does not have the same number of bands as {@code this}
      */
-    void merge(FSReport other);
+    FSReport merge(FSReport other);
 }
