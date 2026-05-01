@@ -67,6 +67,11 @@ public class ArrayFSReport implements FSReport {
         }
     }
 
+    @Override
+    public String toString() {
+        return "[FSReport] Directory: " + this.directory + ", Files: " + this.totalFiles + ", Bands: " + Arrays.toString(this.filesDistribution);
+    }
+
     private int sizeToBandIndex(long size) {
         if (size > this.maxFileSize) {
             return this.bands;

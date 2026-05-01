@@ -13,18 +13,9 @@ public class Async {
         var testPath = Paths.get("C:/Users/andre/Documents/PROGRAMMAZIONE/Tesi");
         var start = System.currentTimeMillis();
 
-        fSStat.getFSReport(testPath, 100_000L, 10).onSuccess(r -> {
-            IO.println("Directory: " + r.getDirectory());
-            IO.println("Total files found: " + r.getTotalFiles());
-            IO.println("Files distribution: " + r.getFilesDistribution());
+        fSStat.getFSReport(testPath, 100_000L, 10).onSuccess(report -> {
             System.out.println("Total time taken: " + (System.currentTimeMillis() - start) / 1000.0 + "s");
+            IO.println(report);
         }).onFailure(System.err::print).onComplete(_ -> vertx.close());
-
-//        Future.all(
-//                fSStat.getFSReport(testPath).onSuccess(f -> IO.println("Files found: " + f)),
-//                fSStat.getFSReport(testPath).onSuccess(f -> IO.println("Files found: " + f))
-//        ).onSuccess(_ ->
-//                System.out.println("Total time taken: " + (System.currentTimeMillis() - start) / 1000.0 + "s")
-//        ).onFailure(System.err::print).onComplete(_ -> vertx.close());
     }
 }
