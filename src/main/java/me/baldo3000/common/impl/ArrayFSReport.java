@@ -71,6 +71,27 @@ public class ArrayFSReport implements FSReport {
     }
 
     @Override
+    public FSReport subtract(FSReport other) {
+        if (this.bands != other.getBands()) {
+            throw new IllegalArgumentException("Can't subtract the two FS Reports, different bands: " + this.bands + " != " + other.getBands());
+        }
+        this.totalFiles -= other.getTotalFiles();
+        var otherDist = other.getFilesDistribution();
+        for (int i = 0; i <= this.bands; i++) {
+            this.filesDistribution[i] -= otherDist.get(i);
+        }
+        return this;
+    }
+
+    @Override
+    public FSReport copy() {
+        var copy = new ArrayFSReport(this.directory, this.maxFileSize, this.bands);
+        copy.totalFiles = this.totalFiles;
+        System.arraycopy(this.filesDistribution, 0, copy.filesDistribution, 0, this.filesDistribution.length);
+        return copy;
+    }
+
+    @Override
     public String toString() {
         return "[FSReport] Directory: " + this.directory + ", Files: " + this.totalFiles + ", Bands: " + Arrays.toString(this.filesDistribution);
     }

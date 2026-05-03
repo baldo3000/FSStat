@@ -52,4 +52,20 @@ public interface FSReport {
      * @throws IllegalArgumentException if the provided report does not have the same number of bands as {@code this}
      */
     FSReport merge(FSReport other);
+
+    /**
+     * Take another {@code FSReport} and subtract it from {@code this}.
+     *
+     * @param other the other {@code FSReport} to subtract
+     * @return a reference to this, so it can be used fluently
+     * @throws IllegalArgumentException if the provided report does not have the same number of bands as {@code this}
+     */
+    FSReport subtract(FSReport other);
+
+    /**
+     * Create a copy of this {@code FSReport}.
+     *
+     * @return the copied report
+     */
+    FSReport copy();
 }
