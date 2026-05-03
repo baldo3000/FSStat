@@ -10,11 +10,11 @@ public class Rx {
         IO.println("Hello World!");
 //        var testPath = Paths.get("C:/Users/andre/Downloads/shish");
 //        var testPath = Paths.get("C:/Users/andre/Documents");
-        var testPath = Paths.get("C:/Users/andre/AppData/roaming/.minecraft");
+        var testPath = Paths.get("C:/Users/andre/AppData");
         var fSStat = new RxFSStatImpl();
         var start = System.currentTimeMillis();
         fSStat.getFSReport(testPath, 100_000L, 10)
-                .takeLast(1)
+                .throttleLatest(500, TimeUnit.MILLISECONDS, true)
                 .blockingSubscribe(report -> IO.println("Report being generated outside: " + report));
         IO.println("Total time taken: " + (System.currentTimeMillis() - start) / 1000.0 + "s");
     }
