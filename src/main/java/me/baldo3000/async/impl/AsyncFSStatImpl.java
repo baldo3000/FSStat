@@ -24,18 +24,17 @@ public class AsyncFSStatImpl implements AsyncFSStat {
     public Future<FSReport> getFSReport(Path directory, long maxFileSize, int bands) {
         IO.println("Generating FS report for directory: " + directory);
 
-        var dir = directory.toString();
-        var report = new ArrayFSReport(dir, maxFileSize, bands);
-        return getFSReportRecursive(dir, new HashSet<>(), report).map(_ -> report);
+        var report = new ArrayFSReport(directory, maxFileSize, bands);
+        return getFSReportRecursive(directory, new HashSet<>(), report).map(_ -> report);
     }
 
-    private Future<Void> getFSReportRecursive(String directory, Set<String> visited, FSReport report) {
+    private Future<Void> getFSReportRecursive(Path directory, Set<Path> visited, FSReport report) {
         if (!visited.add(directory)) {
             return Future.succeededFuture();
         }
         //log("Recursive step");
 
-        return this.fileSystem.readDir(directory)
+        return this.fileSystem.readDir(directory.toString())
                 .recover(_ -> Future.succeededFuture(List.of()))
                 .compose(paths -> {
                     if (paths.isEmpty()) {
@@ -48,7 +47,7 @@ public class AsyncFSStatImpl implements AsyncFSStat {
                                 report.countFileBySize(props.size());
                                 return Future.succeededFuture();
                             } else if (props.isDirectory()) {
-                                return getFSReportRecursive(path, visited, report);
+                                return getFSReportRecursive(Path.of(path), visited, report);
                             }
                             return Future.succeededFuture();
                         }, _ -> Future.succeededFuture());

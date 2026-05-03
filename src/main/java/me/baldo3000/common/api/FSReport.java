@@ -1,5 +1,6 @@
 package me.baldo3000.common.api;
 
+import java.nio.file.Path;
 import java.util.List;
 
 /**
@@ -12,7 +13,7 @@ public interface FSReport {
      *
      * @return the directory
      */
-    String getDirectory();
+    Path getDirectory();
 
     /**
      * The number of bands the FS Report was created with.

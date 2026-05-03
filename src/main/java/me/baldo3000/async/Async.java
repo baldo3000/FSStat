@@ -10,7 +10,7 @@ public class Async {
         IO.println("Hello World!");
         var vertx = Vertx.vertx();
         var fSStat = new AsyncFSStatImpl(vertx);
-        var testPath = Paths.get("C:/Users/andre/AppData");
+        var testPath = Paths.get("C:/Users/andre/AppData/Roaming/.minecraft");
         var start = System.currentTimeMillis();
 
         fSStat.getFSReport(testPath, 100_000L, 10).onSuccess(report -> {

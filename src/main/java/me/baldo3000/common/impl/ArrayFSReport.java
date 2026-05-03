@@ -2,20 +2,21 @@ package me.baldo3000.common.impl;
 
 import me.baldo3000.common.api.FSReport;
 
+import java.nio.file.Path;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Objects;
 
 public class ArrayFSReport implements FSReport {
 
-    private final String directory;
+    private final Path directory;
     private final long maxFileSize;
     private final int bands;
     private final long bandWidth;
     private final long[] filesDistribution;
     private long totalFiles = 0L;
 
-    public ArrayFSReport(String directory, long maxFileSize, int bands) {
+    public ArrayFSReport(Path directory, long maxFileSize, int bands) {
         if (maxFileSize < 0L) {
             throw new IllegalArgumentException("Max file size must be non-negative: " + maxFileSize);
         }
@@ -31,7 +32,7 @@ public class ArrayFSReport implements FSReport {
     }
 
     @Override
-    public String getDirectory() {
+    public Path getDirectory() {
         return this.directory;
     }
 
