@@ -11,6 +11,8 @@ import java.nio.file.LinkOption;
 import java.nio.file.Path;
 import java.nio.file.attribute.BasicFileAttributes;
 import java.util.HashMap;
+import java.util.List;
+import java.util.stream.StreamSupport;
 
 public class RxFSStatImpl implements RxFSStat {
 
@@ -18,35 +20,40 @@ public class RxFSStatImpl implements RxFSStat {
     public Flowable<FSReport> getFSReport(Path path, long maxFileSize, int bands) {
 
         return Flowable.virtualCreate(emitter -> {
+            var report = new ArrayFSReport(path, maxFileSize, bands);
+            // Reading file attributes
             BasicFileAttributes attributes;
             try {
                 attributes = Files.readAttributes(path, BasicFileAttributes.class, LinkOption.NOFOLLOW_LINKS);
             } catch (IOException e) {
-                emitter.emit(new ArrayFSReport(path.toString(), maxFileSize, bands));
+                emitter.emit(report);
                 return;
             }
+
             // Skipping symlinks
             if (attributes.isSymbolicLink() || attributes.isOther()) {
                 return;
             }
-            var report = new ArrayFSReport(path.toString(), maxFileSize, bands);
-//            if ("C:\\Users\\andre\\AppData".equals(report.getDirectory())) log("mow");
+
             if (attributes.isRegularFile()) {
                 emitter.emit(report.countFileBySize(attributes.size()));
 
             } else if (attributes.isDirectory()) {
-                var subPaths = path.toFile().listFiles();
-                if (subPaths == null || subPaths.length == 0) {
+                List<Path> subPaths;
+                try (var stream = Files.newDirectoryStream(path)) {
+                    subPaths = StreamSupport.stream(stream.spliterator(), false).toList();
+                } catch (IOException e) { // Error listing directory
+                    emitter.emit(report);
                     return;
                 }
-                var childReports = new HashMap<String, FSReport>();
-                Flowable.fromArray(subPaths)
-                        .flatMap(subPath -> getFSReport(subPath.toPath(), maxFileSize, bands))
+                if (subPaths.isEmpty()) {
+                    emitter.emit(report); // Avoid creating a Flowable from an empty iterable
+                    return;
+                }
+                var childReports = new HashMap<Path, FSReport>(subPaths.size() * 2);
+                Flowable.fromIterable(subPaths)
+                        .flatMap(subPath -> getFSReport(subPath, maxFileSize, bands))
                         .blockingSubscribe(childReport -> {
-//                            if ("C:\\Users\\andre\\AppData".equals(report.getDirectory())) {
-//                                log("Merging: " + childReport.getDirectory());
-//                                log("Report being generated inside: " + report);
-//                            }
                             FSReport previous = childReports.put(childReport.getDirectory(), childReport);
                             if (previous != null) {
                                 report.subtract(previous);
