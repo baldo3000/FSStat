@@ -37,7 +37,6 @@ public class RxFSStatImpl implements RxFSStat {
 
             if (attributes.isRegularFile()) {
                 emitter.emit(report.countFileBySize(attributes.size()));
-
             } else if (attributes.isDirectory()) {
                 List<Path> subPaths;
                 try (var stream = Files.newDirectoryStream(path)) {
