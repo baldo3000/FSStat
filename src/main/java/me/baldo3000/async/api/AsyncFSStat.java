@@ -15,4 +15,12 @@ public interface AsyncFSStat {
      * @return the future of the computation
      */
     Future<FSReport> getFSReport(Path directory, long maxFileSize, int bands);
+
+    /**
+     * Shuts down the library's internal worker thread pool.
+     * <p>
+     * Do NOT use this class in a try-with-resources block: close() will be
+     * called before any in-flight Future computation has finished.
+     */
+    void shutdown();
 }

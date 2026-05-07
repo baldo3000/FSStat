@@ -26,6 +26,7 @@ public class RxFSStatImpl implements RxFSStat {
             try {
                 attributes = Files.readAttributes(path, BasicFileAttributes.class, LinkOption.NOFOLLOW_LINKS);
             } catch (IOException e) {
+                log("Skipping " + path + ": " + "cannot read file attribute");
                 emitter.emit(report);
                 return;
             }
@@ -42,6 +43,7 @@ public class RxFSStatImpl implements RxFSStat {
                 try (var stream = Files.newDirectoryStream(path)) {
                     subPaths = StreamSupport.stream(stream.spliterator(), false).toList();
                 } catch (IOException e) { // Error listing directory
+                    log("Skipping " + path + ": " + "cannot list subdirectories");
                     emitter.emit(report);
                     return;
                 }

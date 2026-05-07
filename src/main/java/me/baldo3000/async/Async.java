@@ -10,12 +10,16 @@ public class Async {
         IO.println("Hello World!");
         var vertx = Vertx.vertx();
         var fSStat = new AsyncFSStatImpl(vertx);
-        var testPath = Paths.get("C:/Users/andre/AppData/Roaming/.minecraft");
+        var testPath = Paths.get("C:/Users/andre/AppData/roaming/.minecraft");
         var start = System.currentTimeMillis();
 
         fSStat.getFSReport(testPath, 100_000L, 10).onSuccess(report -> {
+            System.out.println(Thread.currentThread().getName() + "\t" + report);
             System.out.println("Total time taken: " + (System.currentTimeMillis() - start) / 1000.0 + "s");
             IO.println(report);
-        }).onFailure(System.err::print).onComplete(_ -> vertx.close());
+        }).onFailure(System.err::print).onComplete(_ -> {
+            fSStat.shutdown();
+            vertx.close();
+        });
     }
 }
