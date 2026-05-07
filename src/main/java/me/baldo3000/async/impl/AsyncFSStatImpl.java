@@ -46,17 +46,17 @@ public class AsyncFSStatImpl implements AsyncFSStat {
 
     public Future<FSReport> getFSReport(Path directory, long maxFileSize, int bands) {
         var report = new ArrayFSReport(directory, maxFileSize, bands);
-        return getFSReportRecursiveExecuteBlocking(directory, report).map(_ -> report);
+        return getFSReportRecursive(directory, report).map(_ -> report);
     }
 
-    private Future<Void> getFSReportRecursiveExecuteBlocking(Path path, FSReport report) {
+    private Future<Void> getFSReportRecursive(Path directory, FSReport report) {
         return this.workerExecutor.<StatResult>executeBlocking(() -> {
             // Code below executed by the worker threads
             BasicFileAttributes attrs;
             try {
-                attrs = Files.readAttributes(path, BasicFileAttributes.class, LinkOption.NOFOLLOW_LINKS);
+                attrs = Files.readAttributes(directory, BasicFileAttributes.class, LinkOption.NOFOLLOW_LINKS);
             } catch (IOException e) {
-                log("Skipping " + path + ": " + "cannot read file attribute");
+                log("Skipping " + directory + ": " + "cannot read file attribute");
                 return new StatResult.Skip();
             }
 
@@ -70,11 +70,11 @@ public class AsyncFSStatImpl implements AsyncFSStat {
             }
 
             if (attrs.isDirectory()) {
-                try (var stream = Files.newDirectoryStream(path)) {
+                try (var stream = Files.newDirectoryStream(directory)) {
                     var children = StreamSupport.stream(stream.spliterator(), false).toList();
                     return new StatResult.Directory(children);
                 } catch (IOException e) {
-                    log("Skipping " + path + ": " + "cannot list subdirectories");
+                    log("Skipping " + directory + ": " + "cannot list subdirectories");
                     return new StatResult.Skip();
                 }
             }
@@ -87,7 +87,7 @@ public class AsyncFSStatImpl implements AsyncFSStat {
             }
             case StatResult.Directory(var children) -> {
                 var futures = children.stream()
-                        .map(child -> getFSReportRecursiveExecuteBlocking(child, report))
+                        .map(child -> getFSReportRecursive(child, report))
                         .toList();
                 yield Future.all(futures).mapEmpty();
             }
