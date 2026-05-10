@@ -8,13 +8,13 @@ import me.baldo3000.common.api.FSReport;
 import me.baldo3000.common.impl.ArrayFSReport;
 
 import java.io.IOException;
+import java.io.UncheckedIOException;
 import java.nio.file.Files;
 import java.nio.file.LinkOption;
 import java.nio.file.Path;
 import java.nio.file.attribute.BasicFileAttributes;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
-import java.util.stream.StreamSupport;
 
 public class AsyncFSStatImpl implements AsyncFSStat {
 
@@ -22,7 +22,7 @@ public class AsyncFSStatImpl implements AsyncFSStat {
         record RegularFile(long size) implements StatResult {
         }
 
-        record Directory(List<Path> children) implements StatResult {
+        record Directory(List<Path> subPaths) implements StatResult {
         }
 
         record Skip() implements StatResult {
@@ -52,32 +52,23 @@ public class AsyncFSStatImpl implements AsyncFSStat {
     private Future<Void> getFSReportRecursive(Path directory, FSReport report) {
         return this.workerExecutor.<StatResult>executeBlocking(() -> {
             // Code below executed by the worker threads
-            BasicFileAttributes attrs;
             try {
-                attrs = Files.readAttributes(directory, BasicFileAttributes.class, LinkOption.NOFOLLOW_LINKS);
-            } catch (IOException e) {
-                log("Skipping " + directory + ": " + "cannot read file attribute");
-                return new StatResult.Skip();
-            }
+                var attrs = Files.readAttributes(directory, BasicFileAttributes.class, LinkOption.NOFOLLOW_LINKS);
 
-            // Skipping symlinks
-            if (attrs.isSymbolicLink() || attrs.isOther()) {
-                return new StatResult.Skip();
-            }
-
-            if (attrs.isRegularFile()) {
-                return new StatResult.RegularFile(attrs.size());
-            }
-
-            if (attrs.isDirectory()) {
-                try (var stream = Files.newDirectoryStream(directory)) {
-                    var children = StreamSupport.stream(stream.spliterator(), false).toList();
-                    return new StatResult.Directory(children);
-                } catch (IOException e) {
-                    log("Skipping " + directory + ": " + "cannot list subdirectories");
-                    return new StatResult.Skip();
+                if (attrs.isRegularFile()) {
+                    return new StatResult.RegularFile(attrs.size());
                 }
+
+                if (attrs.isDirectory()) {
+                    try (var dirStream = Files.list(directory)) {
+                        var subPaths = dirStream.toList();
+                        return new StatResult.Directory(subPaths);
+                    }
+                }
+            } catch (IOException | UncheckedIOException e) {
+                log("Skipping " + directory + ": " + e.getMessage());
             }
+
             return new StatResult.Skip();
         }, false).compose(result -> switch (result) {
             // Code below executed by the event-loop
@@ -85,8 +76,8 @@ public class AsyncFSStatImpl implements AsyncFSStat {
                 report.countFileBySize(size);
                 yield Future.succeededFuture();
             }
-            case StatResult.Directory(var children) -> {
-                var futures = children.stream()
+            case StatResult.Directory(var subPaths) -> {
+                var futures = subPaths.stream()
                         .map(child -> getFSReportRecursive(child, report))
                         .toList();
                 yield Future.all(futures).mapEmpty();
