@@ -6,62 +6,44 @@ import me.baldo3000.common.impl.ArrayFSReport;
 import me.baldo3000.rx.api.RxFSStat;
 
 import java.io.IOException;
+import java.io.UncheckedIOException;
 import java.nio.file.Files;
 import java.nio.file.LinkOption;
 import java.nio.file.Path;
 import java.nio.file.attribute.BasicFileAttributes;
 import java.util.HashMap;
-import java.util.List;
-import java.util.stream.StreamSupport;
 
 public class RxFSStatImpl implements RxFSStat {
 
     @Override
-    public Flowable<FSReport> getFSReport(Path path, long maxFileSize, int bands) {
-
+    public Flowable<FSReport> getFSReport(Path directory, long maxFileSize, int bands) {
         return Flowable.virtualCreate(emitter -> {
-            var report = new ArrayFSReport(path, maxFileSize, bands);
-            // Reading file attributes
-            BasicFileAttributes attributes;
+            var report = new ArrayFSReport(directory, maxFileSize, bands);
+
             try {
-                attributes = Files.readAttributes(path, BasicFileAttributes.class, LinkOption.NOFOLLOW_LINKS);
-            } catch (IOException e) {
-                log("Skipping " + path + ": " + "cannot read file attribute");
-                emitter.emit(report);
-                return;
-            }
+                var attrs = Files.readAttributes(directory, BasicFileAttributes.class, LinkOption.NOFOLLOW_LINKS);
 
-            // Skipping symlinks
-            if (attributes.isSymbolicLink() || attributes.isOther()) {
-                return;
-            }
-
-            if (attributes.isRegularFile()) {
-                emitter.emit(report.countFileBySize(attributes.size()));
-            } else if (attributes.isDirectory()) {
-                List<Path> subPaths;
-                try (var stream = Files.newDirectoryStream(path)) {
-                    subPaths = StreamSupport.stream(stream.spliterator(), false).toList();
-                } catch (IOException e) { // Error listing directory
-                    log("Skipping " + path + ": " + "cannot list subdirectories");
-                    emitter.emit(report);
-                    return;
+                if (attrs.isRegularFile()) {
+                    emitter.emit(report.countFileBySize(attrs.size()));
+                } else if (attrs.isDirectory()) {
+                    try (var dirStream = Files.list(directory)) {
+                        var subPaths = dirStream.toList();
+                        var childReports = new HashMap<Path, FSReport>(subPaths.size() * 2);
+                        Flowable.fromIterable(subPaths)
+                                .flatMap(subPath -> getFSReport(subPath, maxFileSize, bands))
+                                .blockingSubscribe(childReport -> {
+                                    FSReport previous = childReports.put(childReport.getDirectory(), childReport);
+                                    if (previous != null) {
+                                        report.subtract(previous);
+                                    }
+                                    report.merge(childReport);
+                                    emitter.emit(report.copy());
+                                });
+                    }
                 }
-                if (subPaths.isEmpty()) {
-                    emitter.emit(report); // Avoid creating a Flowable from an empty iterable
-                    return;
-                }
-                var childReports = new HashMap<Path, FSReport>(subPaths.size() * 2);
-                Flowable.fromIterable(subPaths)
-                        .flatMap(subPath -> getFSReport(subPath, maxFileSize, bands))
-                        .blockingSubscribe(childReport -> {
-                            FSReport previous = childReports.put(childReport.getDirectory(), childReport);
-                            if (previous != null) {
-                                report.subtract(previous);
-                            }
-                            report.merge(childReport);
-                            emitter.emit(report.copy());
-                        });
+            } catch (IOException | UncheckedIOException e) {
+                log("Skipping " + directory + ": " + e.getMessage());
+                emitter.emit(report); // Emit empty report
             }
         });
     }

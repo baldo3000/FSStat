@@ -8,7 +8,7 @@ import java.util.concurrent.TimeUnit;
 public class Rx {
     static void main() {
         IO.println("Hello World!");
-        var testPath = Paths.get("C:/Users/andre/AppData/Roaming/.minecraft");
+        var testPath = Paths.get("C:/Users/andre/AppData");
         var fSStat = new RxFSStatImpl();
         var start = System.currentTimeMillis();
         fSStat.getFSReport(testPath, 100_000L, 10)
