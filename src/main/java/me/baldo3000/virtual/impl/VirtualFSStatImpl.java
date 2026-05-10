@@ -19,18 +19,18 @@ public class VirtualFSStatImpl implements VirtualFSStat {
         return CompletableFuture.supplyAsync(() -> getFSReportRecursive(directory, maxFileSize, bands));
     }
 
-    private FSReport getFSReportRecursive(Path path, long maxFileSize, int bands) {
-        var report = new ArrayFSReport(path, maxFileSize, bands);
+    private FSReport getFSReportRecursive(Path directory, long maxFileSize, int bands) {
+        var report = new ArrayFSReport(directory, maxFileSize, bands);
 
         try {
-            var attrs = Files.readAttributes(path, BasicFileAttributes.class, LinkOption.NOFOLLOW_LINKS);
+            var attrs = Files.readAttributes(directory, BasicFileAttributes.class, LinkOption.NOFOLLOW_LINKS);
 
             if (attrs.isRegularFile()) {
                 return report.countFileBySize(attrs.size());
             }
 
             if (attrs.isDirectory()) {
-                try (var dirStream = Files.list(path)) {
+                try (var dirStream = Files.list(directory)) {
                     var subPaths = dirStream.toList();
                     CollectorLatch<FSReport> collector = new CollectorLatchImpl<>(subPaths.size());
                     subPaths.forEach(subPath ->
@@ -42,7 +42,7 @@ public class VirtualFSStatImpl implements VirtualFSStat {
                 }
             }
         } catch (IOException | UncheckedIOException e) {
-            log("Skipping " + path + ": " + e.getMessage());
+            log("Skipping " + directory + ": " + e.getMessage());
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt(); // restore interrupted status
         }
