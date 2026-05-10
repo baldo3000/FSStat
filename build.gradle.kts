@@ -10,7 +10,7 @@ repositories {
 }
 
 dependencies {
-    val vertx = "5.0.11"
+    val vertx = "5.0.12"
     val jUnit = "6.0.3"
     val rxJava = "4.0.0-alpha-13"
     implementation("io.vertx:vertx-core:$vertx")
