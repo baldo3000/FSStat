@@ -1,65 +1,112 @@
 package me.baldo3000.rx;
 
 import io.reactivex.rxjava4.disposables.Disposable;
+import me.baldo3000.common.api.FSReport;
 import me.baldo3000.rx.api.RxFSStat;
 import me.baldo3000.rx.impl.RxFSStatImpl;
 
 import javax.swing.*;
-import java.awt.event.ActionEvent;
+import java.awt.*;
+import java.io.File;
 import java.nio.file.Path;
 import java.util.concurrent.TimeUnit;
+import java.util.function.Consumer;
 
 
 public class RxWithGUI {
-    static class MyFrame extends JFrame {
+    public static class FSReportPresenter {
 
         private final RxFSStat fsStat = new RxFSStatImpl();
         private Disposable disposable;
 
+        /**
+         * Cancels any running scan and starts a new one.
+         */
+        public void start(Path path, Consumer<FSReport> onReport, Runnable onComplete) {
+            stop();
+            disposable = fsStat.getFSReport(path, 100_000L, 10)
+                    .throttleLatest(500, TimeUnit.MILLISECONDS, true)
+                    .doOnNext(r -> log(r.toString())) // Debugging
+                    .subscribe(
+                            onReport::accept,
+                            error -> log("Error: " + error.getMessage()),
+                            onComplete::run
+                    );
+        }
+
+        /**
+         * Cancels the running scan, if any.
+         */
+        public void stop() {
+            if (disposable != null && !disposable.isDisposed()) {
+                disposable.dispose();
+            }
+            disposable = null;
+        }
+
+        private void log(String msg) {
+            IO.println("[" + Thread.currentThread() + "] " + msg);
+        }
+    }
+
+    public static class MyFrame extends JFrame {
+
+        private final FSReportPresenter presenter = new FSReportPresenter();
+
         public MyFrame() {
             super("Swing + RxJava");
 
-            JTextArea textArea = new JTextArea(10, 70);
+            JTextArea textArea = new JTextArea(10, 80);
             textArea.setEditable(false);
             JScrollPane scroll = new JScrollPane(textArea);
 
             JTextField inputField = new JTextField(40);
-            inputField.setText("C:/Users/andre/AppData");
 
             JButton startButton = new JButton("Generate FS Report");
             JButton stopButton = new JButton("Stop");
-            JPanel buttonPanel = new JPanel(new java.awt.FlowLayout(java.awt.FlowLayout.CENTER, 5, 5));
+            JButton browseButton = new JButton("Browse...");
+
+            JPanel buttonPanel = new JPanel(new FlowLayout(FlowLayout.CENTER, 5, 5));
             buttonPanel.add(startButton);
             buttonPanel.add(stopButton);
+            buttonPanel.add(browseButton);
 
-            JPanel southPanel = new JPanel(new java.awt.BorderLayout(5, 5));
-            southPanel.add(inputField, java.awt.BorderLayout.NORTH);
-            southPanel.add(buttonPanel, java.awt.BorderLayout.SOUTH);
+            JPanel southPanel = new JPanel(new BorderLayout(5, 5));
+            southPanel.add(inputField, BorderLayout.NORTH);
+            southPanel.add(buttonPanel, BorderLayout.SOUTH);
 
-            getContentPane().setLayout(new java.awt.BorderLayout(8, 8));
-            getContentPane().add(scroll, java.awt.BorderLayout.CENTER);
-            getContentPane().add(southPanel, java.awt.BorderLayout.SOUTH);
+            getContentPane().setLayout(new BorderLayout(8, 8));
+            getContentPane().add(scroll, BorderLayout.CENTER);
+            getContentPane().add(southPanel, BorderLayout.SOUTH);
 
-            startButton.addActionListener((ActionEvent ev) -> {
-                // Always cancel whatever was running before starting fresh.
-                stopCurrentComputation();
-
+            startButton.addActionListener(_ -> {
                 String input = inputField.getText();
-                log("Start pressed: " + input);
-
                 if (input != null && !input.isBlank()) {
                     textArea.setText("");
-                    disposable = fsStat.getFSReport(Path.of(input), 100_000L, 10)
-                            .throttleLatest(500, TimeUnit.MILLISECONDS, true).doOnNext(System.out::println)
-                            .subscribe(
-                                    report -> SwingUtilities.invokeLater(() -> textArea.setText(report.toString()))
-                            );
+                    presenter.start(Path.of(input),
+                            report -> SwingUtilities.invokeLater(() ->
+                                    textArea.setText(report.toString())
+                            ),
+                            () -> SwingUtilities.invokeLater(() -> {
+                                var previous = textArea.getText();
+                                textArea.setText(previous + "\nDone");
+                            })
+                    );
                 }
             });
 
-            stopButton.addActionListener((ActionEvent _) -> {
-                log("Stop pressed");
-                stopCurrentComputation();
+            stopButton.addActionListener(_ -> presenter.stop());
+
+            browseButton.addActionListener(_ -> {
+                // JFileChooser must be used on the EDT; actionPerformed already runs on EDT
+                JFileChooser chooser = getJFileChooser(inputField);
+                int ret = chooser.showOpenDialog(this);
+                if (ret == JFileChooser.APPROVE_OPTION) {
+                    File selected = chooser.getSelectedFile();
+                    if (selected != null) {
+                        inputField.setText(selected.getAbsolutePath());
+                    }
+                }
             });
 
             setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
@@ -67,20 +114,23 @@ public class RxWithGUI {
             setLocationRelativeTo(null);
         }
 
-        private void stopCurrentComputation() {
-            if (disposable != null && !disposable.isDisposed()) {
-                disposable.dispose();
+        private JFileChooser getJFileChooser(JTextField inputField) {
+            JFileChooser chooser = new JFileChooser();
+            chooser.setFileSelectionMode(JFileChooser.DIRECTORIES_ONLY);
+            chooser.setDialogTitle("Select directory");
+            String current = inputField.getText();
+            if (current != null && !current.isBlank()) {
+                File f = new File(current);
+                if (f.exists() && f.isDirectory()) {
+                    chooser.setCurrentDirectory(f);
+                }
             }
-            disposable = null;
+            return chooser;
         }
     }
 
     static void main() {
         IO.println("Hello World!");
         SwingUtilities.invokeLater(() -> new MyFrame().setVisible(true));
-    }
-
-    private static void log(String msg) {
-        IO.println("[" + Thread.currentThread() + "] " + msg);
     }
 }
