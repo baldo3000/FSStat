@@ -98,7 +98,6 @@ public class RxWithGUI {
             stopButton.addActionListener(_ -> presenter.stop());
 
             browseButton.addActionListener(_ -> {
-                // JFileChooser must be used on the EDT; actionPerformed already runs on EDT
                 JFileChooser chooser = getJFileChooser(inputField);
                 int ret = chooser.showOpenDialog(this);
                 if (ret == JFileChooser.APPROVE_OPTION) {
